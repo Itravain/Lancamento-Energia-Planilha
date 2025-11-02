@@ -62,7 +62,7 @@ pip install -r requirements.txt
 Execute o script principal:
 
 ```bash
-python api_planilhas.py
+python main.py
 ```
 
 ## 📁 Estrutura de Arquivos
