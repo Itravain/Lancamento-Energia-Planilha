@@ -76,10 +76,6 @@ Energia/
 └── README.md            # Este arquivo
 ```
 
-## 📄 Licença
-
-[Adicione aqui a licença do seu projeto]
-
 ## 👤 Autor
 
 Ícaro Travain
