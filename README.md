@@ -1,22 +1,19 @@
-# API de Planilhas - Produção de Energia Solar
+# API de Energia Solar
 
-Este projeto é responsável por gerenciar e atualizar dados de produção de energia solar diária em planilhas do Google Sheets.
+Este projeto consulta a API da APSystem e retorna a produção diária de energia solar.
 
 ## 📋 Descrição
 
 O sistema realiza:
-- Conexão com Google Sheets via API
-- Leitura de dados de produção de energia solar
-- Verificação do último lançamento realizado
-- Listagem de meses para processamento
-- Adição de novos dados à planilha automaticamente
+- Autenticação na API da APSystem
+- Consulta de geração diária por mês
+- Exibição no console da geração diária e total do mês atual
 
 ## 🔧 Dependências
 
 As seguintes bibliotecas Python são necessárias:
 
-- `gspread` - Interação com Google Sheets
-- `google-auth` - Autenticação Google OAuth2
+- `requests` - Requisições HTTP para a API
 - `python-dotenv` - Gerenciamento de variáveis de ambiente
 
 ## 📦 Instalação
@@ -35,27 +32,14 @@ pip install -r requirements.txt
 
 ## ⚙️ Configuração
 
-1. **Credenciais Google Cloud:**
-   - Crie um projeto no [Google Cloud Console](https://console.cloud.google.com/)
-   - Ative a API do Google Sheets
-   - Crie uma conta de serviço e baixe o arquivo de credenciais JSON
-   - Renomeie o arquivo para `credentials.json` e coloque na raiz do projeto
-
-2. **Arquivo `.env`:**
+1. **Arquivo `.env`:**
    
    Crie um arquivo `.env` na raiz do projeto com:
    ```
-   SHEET_ID=seu_id_da_planilha_aqui
+   APP_ID=seu_app_id
+   APP_SECRET=seu_app_secret
+   SYSTEM_ID=seu_system_id
    ```
-   
-   O `SHEET_ID` pode ser obtido da URL da planilha:
-   ```
-   https://docs.google.com/spreadsheets/d/SHEET_ID/edit
-   ```
-
-3. **Permissões da Planilha:**
-   - Compartilhe a planilha do Google Sheets com o email da conta de serviço
-   - Dê permissão de Editor
 
 ## 🚀 Como Rodar
 
@@ -69,11 +53,11 @@ python main.py
 
 ```
 Energia/
-├── api_planilhas.py      # Script principal
-├── credentials.json      # Credenciais Google (não versionar!)
-├── .env                  # Variáveis de ambiente (não versionar!)
-├── .gitignore           # Arquivos a ignorar no Git
-└── README.md            # Este arquivo
+├── api_energia.py        # Cliente da API APSystem
+├── main.py               # Script principal
+├── .env                  # Variáveis de ambiente (não versionar)
+├── .gitignore            # Arquivos a ignorar no Git
+└── README.md             # Este arquivo
 ```
 
 ## 👤 Autor
