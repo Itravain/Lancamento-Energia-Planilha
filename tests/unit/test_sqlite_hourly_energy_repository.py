@@ -47,3 +47,24 @@ def test_upsert_is_idempotent(tmp_path: pytest.TempPathFactory) -> None:
     )
 
     assert result == {datetime(2026, 4, 19, 10): 1.1}
+
+
+def test_get_range_is_isolated_by_system_id(tmp_path: pytest.TempPathFactory) -> None:
+    """Garante que consulta de um sistema não retorna dados de outro."""
+    db_path = tmp_path / "energy.db"
+    repository = SQLiteHourlyEnergyRepository(str(db_path))
+
+    repository.upsert_many(
+        [
+            HourlyEnergyRecord("sys-1", datetime(2026, 4, 19, 10), 1.1),
+            HourlyEnergyRecord("sys-2", datetime(2026, 4, 19, 10), 9.9),
+        ]
+    )
+
+    result = repository.get_range(
+        "sys-1",
+        datetime(2026, 4, 19, 10),
+        datetime(2026, 4, 19, 10),
+    )
+
+    assert result == {datetime(2026, 4, 19, 10): 1.1}

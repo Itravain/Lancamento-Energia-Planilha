@@ -24,6 +24,20 @@ class FakeHourlyProvider:
         return self.payload
 
 
+class FailingHourlyProvider:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def fetch_hourly_generation(
+        self,
+        system_id: str,
+        start_at: datetime,
+        end_at: datetime,
+    ) -> dict[datetime, float]:
+        self.calls += 1
+        raise RuntimeError("api down")
+
+
 class FakeHourlyRepository:
     def __init__(self, initial: dict[datetime, float] | None = None) -> None:
         self.data = dict(initial or {})
@@ -96,3 +110,21 @@ def test_execute_raises_for_invalid_range() -> None:
             datetime(2026, 4, 20, 10),
             datetime(2026, 4, 19, 10),
         )
+
+
+def test_execute_returns_cached_data_when_provider_fails() -> None:
+    """Quando a API falha, deve retornar o cache já disponível."""
+    start = datetime(2026, 4, 19, 10)
+    end = datetime(2026, 4, 19, 12)
+    cached = {
+        datetime(2026, 4, 19, 10): 1.1,
+        datetime(2026, 4, 19, 11): 1.2,
+    }
+    provider = FailingHourlyProvider()
+    repository = FakeHourlyRepository(initial=cached)
+
+    use_case = GetHourlyEnergyRange(provider, repository)
+    result = use_case.execute("sys-1", start, end)
+
+    assert provider.calls == 1
+    assert result == cached

@@ -1,7 +1,7 @@
 import pytest
 
 from src.domain.energy_report import MonthlyEnergyReport
-from src.main import run
+from src.main import run, run_hourly
 
 
 pytestmark = pytest.mark.integration
@@ -82,3 +82,13 @@ def test_run_hourly_mode_wires_hourly_dependencies(monkeypatch: pytest.MonkeyPat
     assert captured["db_path"] == "/tmp/energy.db"
     assert captured["system_id"] == "sys-1"
     assert captured["printed"] == {}
+
+
+def test_run_hourly_raises_when_system_id_missing(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Valida erro explícito quando SYSTEM_ID não está configurado."""
+    monkeypatch.setenv("HOURLY_START_AT", "2026-04-19 10:00")
+    monkeypatch.setenv("HOURLY_END_AT", "2026-04-19 12:00")
+    monkeypatch.delenv("SYSTEM_ID", raising=False)
+
+    with pytest.raises(ValueError):
+        run_hourly()
