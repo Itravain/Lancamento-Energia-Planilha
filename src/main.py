@@ -29,6 +29,8 @@ def run_hourly() -> None:
 
     if not start_raw or not end_raw:
         raise ValueError("Defina HOURLY_START_AT e HOURLY_END_AT no formato YYYY-MM-DD HH:MM")
+    if not system_id:
+        raise ValueError("Defina SYSTEM_ID para executar o modo horário.")
 
     start_at = datetime.strptime(start_raw, "%Y-%m-%d %H:%M")
     end_at = datetime.strptime(end_raw, "%Y-%m-%d %H:%M")
