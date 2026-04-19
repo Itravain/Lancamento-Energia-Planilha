@@ -1,81 +1,101 @@
-# API de Planilhas - Produção de Energia Solar
+# API de Energia Solar
 
-Este projeto é responsável por gerenciar e atualizar dados de produção de energia solar diária em planilhas do Google Sheets.
+Projeto estruturado com Clean Architecture e TDD para consultar a API da APSystem e imprimir no console a geração diária e total do mês atual.
 
-## 📋 Descrição
+## Estrutura do Projeto
 
-O sistema realiza:
-- Conexão com Google Sheets via API
-- Leitura de dados de produção de energia solar
-- Verificação do último lançamento realizado
-- Listagem de meses para processamento
-- Adição de novos dados à planilha automaticamente
-
-## 🔧 Dependências
-
-As seguintes bibliotecas Python são necessárias:
-
-- `gspread` - Interação com Google Sheets
-- `google-auth` - Autenticação Google OAuth2
-- `python-dotenv` - Gerenciamento de variáveis de ambiente
-
-## 📦 Instalação
-
-1. Clone o repositório ou baixe os arquivos do projeto
-
-2. Instale as dependências:
-```bash
-pip install gspread google-auth python-dotenv
-```
-
-ou usando um arquivo `requirements.txt`:
-```bash
-pip install -r requirements.txt
-```
-
-## ⚙️ Configuração
-
-1. **Credenciais Google Cloud:**
-   - Crie um projeto no [Google Cloud Console](https://console.cloud.google.com/)
-   - Ative a API do Google Sheets
-   - Crie uma conta de serviço e baixe o arquivo de credenciais JSON
-   - Renomeie o arquivo para `credentials.json` e coloque na raiz do projeto
-
-2. **Arquivo `.env`:**
-   
-   Crie um arquivo `.env` na raiz do projeto com:
-   ```
-   SHEET_ID=seu_id_da_planilha_aqui
-   ```
-   
-   O `SHEET_ID` pode ser obtido da URL da planilha:
-   ```
-   https://docs.google.com/spreadsheets/d/SHEET_ID/edit
-   ```
-
-3. **Permissões da Planilha:**
-   - Compartilhe a planilha do Google Sheets com o email da conta de serviço
-   - Dê permissão de Editor
-
-## 🚀 Como Rodar
-
-Execute o script principal:
-
-```bash
-python main.py
-```
-
-## 📁 Estrutura de Arquivos
-
-```
 Energia/
-├── api_planilhas.py      # Script principal
-├── credentials.json      # Credenciais Google (não versionar!)
-├── .env                  # Variáveis de ambiente (não versionar!)
-├── .gitignore           # Arquivos a ignorar no Git
-└── README.md            # Este arquivo
-```
+- src/
+  - application/
+    - __init__.py
+    - get_current_month_generation.py
+    - ports.py
+  - domain/
+    - __init__.py
+    - energy_report.py
+  - infrastructure/
+    - __init__.py
+    - apsystem_energy_provider.py
+  - interfaces/
+    - __init__.py
+    - cli.py
+  - __init__.py
+  - main.py
+- tests/
+  - unit/
+    - test_apsystem_energy_provider.py
+    - test_cli.py
+    - test_energy_report.py
+    - test_get_current_month_generation.py
+  - integration/
+    - test_run_wiring.py
+    - test_apsystem_real.py
+- .github/
+  - copilot-instructions.md
+- main.py
+- Makefile
+- requirements.txt
+- pytest.ini
+- README.md
 
-## 👤 Autor
+## Dependências
 
-Ícaro Travain
+- requests
+- python-dotenv
+- pytest
+
+## Configuração
+
+Crie o arquivo .env na raiz do projeto com:
+
+APP_ID=seu_app_id  
+APP_SECRET=seu_app_secret  
+SYSTEM_ID=seu_system_id
+
+## Execução
+
+Opção 1:
+python main.py
+
+Opção 2:
+python -m src.main
+
+Opção 3 (atalho):
+make run
+
+## Testes
+
+Sequência recomendada:
+1. Unitários
+make test-unit
+
+2. Integração sem API real
+make test-integration
+
+3. Integração real (opt-in)
+make test-real
+
+Execução padrão:
+make test
+
+Observação:
+- O [pytest.ini](pytest.ini) já exclui integration_real por padrão.
+- O teste real só deve rodar sob demanda para evitar consumo desnecessário da APSystem.
+
+## Convenção de Branches
+
+- main: produção
+- develop: integração
+- feature/*: novas funcionalidades
+
+## Fluxo de Qualidade
+
+1. Em feature:
+- make test-unit
+- make test-integration
+
+2. Antes de merge em develop:
+- make test
+
+3. Antes de release (quando necessário):
+- make test-real
