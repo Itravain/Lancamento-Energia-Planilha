@@ -4,7 +4,6 @@ import uuid
 import time
 import requests
 from hashlib import sha256
-from hashlib import sha1
 import os
 from dotenv import load_dotenv
 from datetime import datetime, timedelta
@@ -28,7 +27,6 @@ def energia_mes(mes, ano):
 
     # Create the string to sign
     stringToSign = f"{timestamp}/{nonce}/{appId}/{requestPath}/{requestMethod}/{signatureMethod}"
-    print(stringToSign)
 
     # Generate the signature
     # HmacSHA256
