@@ -31,7 +31,10 @@ class GetHourlyEnergyRange:
         missing_hours = [hour for hour in expected_hours if hour not in cached]
 
         if missing_hours:
-            fetched = self.energy_provider.fetch_hourly_generation(system_id, start_at, end_at)
+            try:
+                fetched = self.energy_provider.fetch_hourly_generation(system_id, start_at, end_at)
+            except Exception:
+                return {hour: cached[hour] for hour in sorted(cached.keys())}
             to_persist = [
                 HourlyEnergyRecord(system_id, hour, energy)
                 for hour, energy in fetched.items()
