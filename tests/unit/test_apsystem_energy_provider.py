@@ -1,3 +1,5 @@
+from datetime import datetime
+
 import base64
 import hmac
 from hashlib import sha256
@@ -161,3 +163,93 @@ def test_build_headers_has_expected_signature(
     assert headers["X-CA-Nonce"] == nonce
     assert headers["X-CA-Signature-Method"] == "HmacSHA256"
     assert headers["X-CA-Signature"] == expected_signature
+
+
+def test_fetch_hourly_generation_maps_sequence_response(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Converte resposta sequencial por hora para mapa datetime -> energia."""
+    monkeypatch.setenv("APP_ID", "app")
+    monkeypatch.setenv("APP_SECRET", "secret")
+    monkeypatch.setenv("SYSTEM_ID", "system")
+
+    day_payload = [None] * 24
+    day_payload[10] = 1.0
+    day_payload[11] = 2.0
+
+    def fake_get(*args: object, **kwargs: object) -> FakeResponse:
+        return FakeResponse(ok=True, status_code=200, payload={"data": day_payload})
+
+    monkeypatch.setattr("src.infrastructure.apsystem_energy_provider.requests.get", fake_get)
+
+    provider = APSystemEnergyProvider()
+    result = provider.fetch_hourly_generation(
+        "system",
+        datetime(2026, 4, 19, 10),
+        datetime(2026, 4, 19, 12),
+    )
+
+    assert result == {
+        datetime(2026, 4, 19, 10): 1.0,
+        datetime(2026, 4, 19, 11): 2.0,
+    }
+
+
+def test_fetch_hourly_generation_maps_object_list_response(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Converte resposta em lista de objetos para mapa horário filtrado por range."""
+    monkeypatch.setenv("APP_ID", "app")
+    monkeypatch.setenv("APP_SECRET", "secret")
+    monkeypatch.setenv("SYSTEM_ID", "system")
+
+    payload = {
+        "data": [
+            {"datetime": "2026-04-19 10:00", "energy": 1.1},
+            {"datetime": "2026-04-19 11:00", "energy": 1.2},
+            {"datetime": "2026-04-19 13:00", "energy": 1.4},
+        ]
+    }
+
+    def fake_get(*args: object, **kwargs: object) -> FakeResponse:
+        return FakeResponse(ok=True, status_code=200, payload=payload)
+
+    monkeypatch.setattr("src.infrastructure.apsystem_energy_provider.requests.get", fake_get)
+
+    provider = APSystemEnergyProvider()
+    result = provider.fetch_hourly_generation(
+        "system",
+        datetime(2026, 4, 19, 10),
+        datetime(2026, 4, 19, 12),
+    )
+
+    assert result == {
+        datetime(2026, 4, 19, 10): 1.1,
+        datetime(2026, 4, 19, 11): 1.2,
+    }
+
+
+def test_fetch_hourly_generation_requests_each_day_with_single_date_range(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Garante uso de date_range diário (sem vírgula) no modo horário."""
+    monkeypatch.setenv("APP_ID", "app")
+    monkeypatch.setenv("APP_SECRET", "secret")
+    monkeypatch.setenv("SYSTEM_ID", "system")
+    captured_ranges: list[str] = []
+
+    def fake_get(*args: object, **kwargs: object) -> FakeResponse:
+        params = kwargs.get("params", {})
+        captured_ranges.append(str(params.get("date_range")))
+        return FakeResponse(ok=True, status_code=200, payload={"data": [0] * 24})
+
+    monkeypatch.setattr("src.infrastructure.apsystem_energy_provider.requests.get", fake_get)
+
+    provider = APSystemEnergyProvider()
+    provider.fetch_hourly_generation(
+        "system",
+        datetime(2026, 4, 18, 23),
+        datetime(2026, 4, 19, 1),
+    )
+
+    assert captured_ranges == ["2026-04-18", "2026-04-19"]
