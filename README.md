@@ -1,81 +1,147 @@
-# API de Planilhas - Produção de Energia Solar
+# API de Energia Solar
 
-Este projeto é responsável por gerenciar e atualizar dados de produção de energia solar diária em planilhas do Google Sheets.
+Projeto estruturado com Clean Architecture e TDD para consultar a API da APSystem.
 
-## 📋 Descrição
+O projeto possui dois fluxos principais:
+1. Modo mensal: consulta geração diária do mês atual.
+2. Modo horário: consulta geração horária por intervalo com estratégia cache-first em SQLite.
 
-O sistema realiza:
-- Conexão com Google Sheets via API
-- Leitura de dados de produção de energia solar
-- Verificação do último lançamento realizado
-- Listagem de meses para processamento
-- Adição de novos dados à planilha automaticamente
+## Estrutura do Projeto
 
-## 🔧 Dependências
+Energia/
+- src/
+  - application/
+    - __init__.py
+    - get_current_month_generation.py
+    - get_hourly_energy_range.py
+    - ports.py
+  - domain/
+    - __init__.py
+    - energy_report.py
+  - infrastructure/
+    - __init__.py
+    - apsystem_energy_provider.py
+    - sqlite_hourly_energy_repository.py
+  - interfaces/
+    - __init__.py
+    - cli.py
+  - __init__.py
+  - main.py
+- tests/
+  - unit/
+    - test_apsystem_energy_provider.py
+    - test_cli.py
+    - test_energy_report.py
+    - test_get_current_month_generation.py
+    - test_get_hourly_energy_range.py
+    - test_sqlite_hourly_energy_repository.py
+  - integration/
+    - test_run_wiring.py
+    - test_apsystem_real.py
+    - test_hourly_cache_flow.py
+- .github/
+  - copilot-instructions.md
+- main.py
+- Makefile
+- requirements.txt
+- pytest.ini
+- README.md
 
-As seguintes bibliotecas Python são necessárias:
+## Dependências
 
-- `gspread` - Interação com Google Sheets
-- `google-auth` - Autenticação Google OAuth2
-- `python-dotenv` - Gerenciamento de variáveis de ambiente
+- requests
+- python-dotenv
+- pytest
 
-## 📦 Instalação
+## Configuração
 
-1. Clone o repositório ou baixe os arquivos do projeto
+Crie o arquivo .env na raiz do projeto com:
 
-2. Instale as dependências:
-```bash
-pip install gspread google-auth python-dotenv
-```
+APP_ID=seu_app_id  
+APP_SECRET=seu_app_secret  
+SYSTEM_ID=seu_system_id
 
-ou usando um arquivo `requirements.txt`:
-```bash
-pip install -r requirements.txt
-```
+# Opcional para modo horário
+ENERGY_MODE=monthly
+HOURLY_START_AT=2026-04-19 00:00
+HOURLY_END_AT=2026-04-19 23:00
+ENERGY_DB_PATH=energy.db
 
-## ⚙️ Configuração
+## Execução
 
-1. **Credenciais Google Cloud:**
-   - Crie um projeto no [Google Cloud Console](https://console.cloud.google.com/)
-   - Ative a API do Google Sheets
-   - Crie uma conta de serviço e baixe o arquivo de credenciais JSON
-   - Renomeie o arquivo para `credentials.json` e coloque na raiz do projeto
+Opção 1:
+python main.py
 
-2. **Arquivo `.env`:**
-   
-   Crie um arquivo `.env` na raiz do projeto com:
-   ```
-   SHEET_ID=seu_id_da_planilha_aqui
-   ```
-   
-   O `SHEET_ID` pode ser obtido da URL da planilha:
-   ```
-   https://docs.google.com/spreadsheets/d/SHEET_ID/edit
-   ```
+Opção 2:
+python -m src.main
 
-3. **Permissões da Planilha:**
-   - Compartilhe a planilha do Google Sheets com o email da conta de serviço
-   - Dê permissão de Editor
+Opção 3 (atalho):
+make run
 
-## 🚀 Como Rodar
-
-Execute o script principal:
+### Modo mensal (padrão)
 
 ```bash
 python main.py
 ```
 
-## 📁 Estrutura de Arquivos
+### Modo horário com cache SQLite
 
+```bash
+ENERGY_MODE=hourly \
+HOURLY_START_AT="2026-04-19 00:00" \
+HOURLY_END_AT="2026-04-19 23:00" \
+SYSTEM_ID="seu_system_id" \
+ENERGY_DB_PATH="energy.db" \
+python main.py
 ```
-Energia/
-├── api_planilhas.py      # Script principal
-├── credentials.json      # Credenciais Google (não versionar!)
-├── .env                  # Variáveis de ambiente (não versionar!)
-├── .gitignore           # Arquivos a ignorar no Git
-└── README.md            # Este arquivo
+
+No modo horário, o sistema:
+1. Busca primeiro no SQLite.
+2. Consulta a API apenas para lacunas.
+3. Persiste os dados novos.
+4. Retorna o consolidado ordenado por hora.
+
+## Testes
+
+Sequência recomendada:
+1. Unitários
+make test-unit
+
+2. Integração sem API real
+make test-integration
+
+3. Integração real (opt-in)
+make test-real
+
+Execução padrão:
+make test
+
+Observação:
+- O [pytest.ini](pytest.ini) já exclui integration_real por padrão.
+- O teste real só deve rodar sob demanda para evitar consumo desnecessário da APSystem.
+
+### Testes de API real (opt-in)
+
+```bash
+RUN_APSYSTEM_INTEGRATION=true make test-real
 ```
 
-## 👤 Autor
+Esse alvo executa os testes marcados como `integration_real`.
 
-Ícaro Travain
+## Convenção de Branches
+
+- main: produção
+- develop: integração
+- feature/*: novas funcionalidades
+
+## Fluxo de Qualidade
+
+1. Em feature:
+- make test-unit
+- make test-integration
+
+2. Antes de merge em develop:
+- make test
+
+3. Antes de release (quando necessário):
+- make test-real
