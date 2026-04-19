@@ -1,65 +1,56 @@
 # API de Energia Solar
 
-Este projeto consulta a API da APSystem e retorna a produção diária de energia solar.
+Projeto estruturado com Clean Architecture e TDD para consultar a API da APSystem
+e imprimir no console a geração diária e total do mês atual.
 
-## 📋 Descrição
+## Estrutura
 
-O sistema realiza:
-- Autenticação na API da APSystem
-- Consulta de geração diária por mês
-- Exibição no console da geração diária e total do mês atual
-
-## 🔧 Dependências
-
-As seguintes bibliotecas Python são necessárias:
-
-- `requests` - Requisições HTTP para a API
-- `python-dotenv` - Gerenciamento de variáveis de ambiente
-
-## 📦 Instalação
-
-1. Clone o repositório ou baixe os arquivos do projeto
-
-2. Instale as dependências:
-```bash
-pip install gspread google-auth python-dotenv
+```
+Energia/
+├── src/
+│   ├── domain/                # Regras e modelos de domínio
+│   ├── application/           # Casos de uso e contratos
+│   ├── infrastructure/        # Integrações externas (APSystem)
+│   ├── interfaces/            # Camada de apresentação (CLI)
+│   └── main.py                # Composição da aplicação
+├── tests/
+│   ├── unit/                  # Testes unitários (TDD)
+│   └── integration/           # Testes de integração
+├── main.py                    # Launcher da raiz
+├── requirements.txt
+└── pytest.ini
 ```
 
-ou usando um arquivo `requirements.txt`:
-```bash
-pip install -r requirements.txt
+## Dependências
+
+- requests
+- python-dotenv
+- pytest
+
+## Configuração
+
+Crie o arquivo `.env` na raiz do projeto:
+
+```env
+APP_ID=seu_app_id
+APP_SECRET=seu_app_secret
+SYSTEM_ID=seu_system_id
 ```
 
-## ⚙️ Configuração
-
-1. **Arquivo `.env`:**
-   
-   Crie um arquivo `.env` na raiz do projeto com:
-   ```
-   APP_ID=seu_app_id
-   APP_SECRET=seu_app_secret
-   SYSTEM_ID=seu_system_id
-   ```
-
-## 🚀 Como Rodar
-
-Execute o script principal:
+## Execução
 
 ```bash
 python main.py
 ```
 
-## 📁 Estrutura de Arquivos
+ou
 
-```
-Energia/
-├── api_energia.py        # Cliente da API APSystem
-├── main.py               # Script principal
-├── .env                  # Variáveis de ambiente (não versionar)
-├── .gitignore            # Arquivos a ignorar no Git
-└── README.md             # Este arquivo
+```bash
+python -m src.main
 ```
 
-## 👤 Autor
+## Testes
 
-Ícaro Travain
+```bash
+pytest
+```
