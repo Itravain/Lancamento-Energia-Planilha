@@ -1,12 +1,16 @@
 import argparse
 import os
+import shlex
 from datetime import date, datetime
+
+from dotenv import load_dotenv
 
 from src.application.get_current_month_generation import GetCurrentMonthGeneration
 from src.application.get_day_generation import GetDayGeneration
 from src.application.get_hourly_energy_range import GetHourlyEnergyRange
 from src.application.get_month_generation import GetMonthGeneration
 from src.application.get_year_generation import GetYearGeneration
+from src.domain.energy_report import HourlyEnergyRecord
 from src.infrastructure.apsystem_energy_provider import APSystemEnergyProvider
 from src.infrastructure.sqlite_hourly_energy_repository import SQLiteHourlyEnergyRepository
 from src.interfaces.cli import (
@@ -15,6 +19,10 @@ from src.interfaces.cli import (
     print_monthly_report,
     print_yearly_report,
 )
+
+
+# Carrega .env automaticamente para CLI funcionar sem export manual.
+load_dotenv()
 
 
 def run() -> None:
@@ -192,6 +200,206 @@ def run_terminal(argv: list[str]) -> None:
         return
 
     raise ValueError("Comando inválido.")
+
+
+def run_hybrid_interface() -> None:
+    """Exibe menu inicial com modo comandos legado ou modo interativo hierárquico."""
+    while True:
+        print("Modo de entrada")
+        print("1) Modo comandos (legado)")
+        print("2) Modo interativo (hierárquico)")
+        print("q) Sair")
+
+        choice = input("Opcao: ").strip().lower()
+        if choice == "q":
+            return
+        if choice == "1":
+            command_line = input("Digite o comando (ex: monthly --month 4 --year 2026): ").strip()
+            if not command_line:
+                print("Comando vazio. Retornando ao menu inicial.")
+                continue
+            try:
+                run_terminal(shlex.split(command_line))
+            except (ValueError, SystemExit) as error:
+                print(f"Erro no modo comandos: {error}")
+            continue
+        if choice == "2":
+            try:
+                run_hierarchical_navigation()
+            except ValueError as error:
+                print(f"Erro no modo interativo: {error}")
+            continue
+
+        print("Opcao inválida.")
+
+
+def run_hierarchical_navigation() -> None:
+    """Navega por ano -> mês -> dia -> hora usando somente dados já no banco."""
+    system_id = os.getenv("SYSTEM_ID", "").strip()
+    if not system_id:
+        system_id = input("SYSTEM_ID não definido. Informe o System ID (ou q para voltar): ").strip()
+        if not system_id or system_id.lower() == "q":
+            print("Modo interativo cancelado: SYSTEM_ID não informado.")
+            return
+
+    db_path = os.getenv("ENERGY_DB_PATH", "energy.db")
+    repository = SQLiteHourlyEnergyRepository(db_path)
+    provider = APSystemEnergyProvider()
+
+    selected_year: int | None = None
+    selected_month: int | None = None
+    selected_day: int | None = None
+
+    while True:
+        if selected_year is None:
+            year_rows = repository.list_years(system_id)
+            print("\nNível Ano")
+            for index, (year, total) in enumerate(year_rows, start=1):
+                print(f"{index}) {year} - total: {total:.2f}")
+            print("Use o índice para entrar em um ano.")
+            print("0) Voltar")
+            print("q) Sair")
+            raw = input("Opcao: ").strip().lower()
+            if raw == "q":
+                return
+            if raw == "0":
+                continue
+            if raw.isdigit() and 1 <= int(raw) <= len(year_rows):
+                selected_year = year_rows[int(raw) - 1][0]
+                continue
+            print("Opcao inválida.")
+            continue
+
+        if selected_month is None:
+            month_rows = repository.list_months(system_id, selected_year)
+            print(f"\nNível Mês - Ano {selected_year}")
+            for index, (month, total) in enumerate(month_rows, start=1):
+                print(f"{index}) {month:02d} - total: {total:.2f}")
+            print("Use o índice para entrar em um mês.")
+            print("Use api:<mes> para buscar novo mês (ex: api:05).")
+            print("0) Voltar")
+            print("q) Sair")
+            raw = input("Opcao: ").strip().lower()
+            if raw == "q":
+                return
+            if raw == "0":
+                selected_year = None
+                continue
+            if raw.startswith("api:"):
+                api_value = _parse_api_index(raw)
+                if api_value is None or api_value < 1 or api_value > 12:
+                    print("Indice de API inválido para mês. Use 1..12.")
+                    continue
+                _fetch_month_to_cache(provider, repository, system_id, selected_year, api_value)
+                print("Dados do mês persistidos com sucesso.")
+                continue
+            if raw.isdigit() and 1 <= int(raw) <= len(month_rows):
+                selected_month = month_rows[int(raw) - 1][0]
+                continue
+            print("Opcao inválida.")
+            continue
+
+        if selected_day is None:
+            day_rows = repository.list_days(system_id, selected_year, selected_month)
+            print(f"\nNível Dia - {selected_month:02d}/{selected_year}")
+            for index, (day, total) in enumerate(day_rows, start=1):
+                print(f"{index}) {day:02d} - total: {total:.2f}")
+            print("Use o índice para entrar em um dia.")
+            print("Use api:<dia> para buscar novo dia (ex: api:19).")
+            print("0) Voltar")
+            print("q) Sair")
+            raw = input("Opcao: ").strip().lower()
+            if raw == "q":
+                return
+            if raw == "0":
+                selected_month = None
+                continue
+            if raw.startswith("api:"):
+                api_value = _parse_api_index(raw)
+                if api_value is None or api_value < 1 or api_value > 31:
+                    print("Indice de API inválido para dia. Use 1..31.")
+                    continue
+                _fetch_day_to_cache(provider, repository, system_id, selected_year, selected_month, api_value)
+                print("Dados do dia persistidos com sucesso.")
+                continue
+            if raw.isdigit() and 1 <= int(raw) <= len(day_rows):
+                selected_day = day_rows[int(raw) - 1][0]
+                continue
+            print("Opcao inválida.")
+            continue
+
+        hour_rows = repository.list_hours(system_id, selected_year, selected_month, selected_day)
+        print(f"\nNível Hora - {selected_day:02d}/{selected_month:02d}/{selected_year}")
+        for hour, energy in hour_rows:
+            print(f"{hour:02d}:00 -> {energy}")
+        print("Comando api:indice não permitido neste nível.")
+        print("0) Voltar")
+        print("q) Sair")
+        raw = input("Opcao: ").strip().lower()
+        if raw == "q":
+            return
+        if raw == "0":
+            selected_day = None
+            continue
+        print("Opcao inválida.")
+
+
+def _parse_api_index(raw: str) -> int | None:
+    """Extrai índice numérico de comandos no formato api:<indice>."""
+    parts = raw.split(":", maxsplit=1)
+    if len(parts) != 2:
+        return None
+    if not parts[1].isdigit():
+        return None
+    return int(parts[1])
+
+
+def _fetch_month_to_cache(
+    provider: APSystemEnergyProvider,
+    repository: SQLiteHourlyEnergyRepository,
+    system_id: str,
+    year: int,
+    month: int,
+) -> None:
+    """Busca todas as horas de um mês na API e persiste no cache."""
+    start_at, end_at = repository.month_day_bounds(year, month)
+    generation = provider.fetch_hourly_generation(system_id, start_at, end_at)
+    if not generation:
+        return
+    records = [
+        HourlyEnergyRecord(
+            system_id,
+            generation_at,
+            energy,
+        )
+        for generation_at, energy in generation.items()
+    ]
+    repository.upsert_many(records)
+
+
+def _fetch_day_to_cache(
+    provider: APSystemEnergyProvider,
+    repository: SQLiteHourlyEnergyRepository,
+    system_id: str,
+    year: int,
+    month: int,
+    day: int,
+) -> None:
+    """Busca todas as horas de um dia na API e persiste no cache."""
+    start_at = datetime(year, month, day, 0, 0)
+    end_at = datetime(year, month, day, 23, 0)
+    generation = provider.fetch_hourly_generation(system_id, start_at, end_at)
+    if not generation:
+        return
+    records = [
+        HourlyEnergyRecord(
+            system_id,
+            generation_at,
+            energy,
+        )
+        for generation_at, energy in generation.items()
+    ]
+    repository.upsert_many(records)
 
 
 if __name__ == "__main__":

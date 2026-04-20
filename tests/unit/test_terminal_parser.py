@@ -1,6 +1,6 @@
 import pytest
 
-from src.main import parse_terminal_args
+from src.main import _parse_api_index, parse_terminal_args
 
 
 pytestmark = pytest.mark.unit
@@ -54,3 +54,14 @@ def test_parse_menu_command() -> None:
     args = parse_terminal_args(["menu"])
 
     assert args.command == "menu"
+
+
+def test_parse_api_index_with_valid_value() -> None:
+    assert _parse_api_index("api:05") == 5
+
+
+def test_parse_api_index_with_invalid_value() -> None:
+    assert _parse_api_index("api:xx") is None
+    assert _parse_api_index("api") is None
+
+

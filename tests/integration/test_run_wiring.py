@@ -1,7 +1,7 @@
 import pytest
 
 from src.domain.energy_report import MonthlyEnergyReport
-from src.main import run, run_hourly, run_terminal
+from src.main import run, run_hourly, run_hybrid_interface, run_hierarchical_navigation, run_terminal
 
 
 pytestmark = pytest.mark.integration
@@ -151,3 +151,162 @@ def test_run_terminal_dispatches_menu(monkeypatch: pytest.MonkeyPatch) -> None:
     run_terminal(["menu"])
 
     assert captured["called"] is True
+
+
+def test_run_hybrid_interface_dispatches_command_mode(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Valida opção 1 do menu híbrido com comando legado."""
+    captured: dict[str, object] = {}
+    prompts = iter(["1", "monthly --month 4 --year 2026", "q"])
+
+    def fake_input(prompt: str) -> str:
+        captured["prompt"] = prompt
+        return next(prompts)
+
+    def fake_run_terminal(argv: list[str]) -> None:
+        captured["argv"] = argv
+
+    monkeypatch.setattr("builtins.input", fake_input)
+    monkeypatch.setattr("src.main.run_terminal", fake_run_terminal)
+
+    run_hybrid_interface()
+
+    assert captured["argv"] == ["monthly", "--month", "4", "--year", "2026"]
+
+
+def test_run_hybrid_interface_dispatches_interactive_mode(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Valida opção 2 do menu híbrido."""
+    captured = {"called": False}
+    prompts = iter(["2", "q"])
+
+    def fake_input(prompt: str) -> str:
+        return next(prompts)
+
+    def fake_navigation() -> None:
+        captured["called"] = True
+
+    monkeypatch.setattr("builtins.input", fake_input)
+    monkeypatch.setattr("src.main.run_hierarchical_navigation", fake_navigation)
+
+    run_hybrid_interface()
+
+    assert captured["called"] is True
+
+
+def test_run_hybrid_interface_handles_interactive_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Valida que erro no modo 2 é tratado sem traceback."""
+    captured: dict[str, object] = {"printed": []}
+    prompts = iter(["2", "q"])
+
+    def fake_input(prompt: str) -> str:
+        return next(prompts)
+
+    def fake_navigation() -> None:
+        raise ValueError("Defina SYSTEM_ID para usar o modo interativo hierárquico.")
+
+    def fake_print(*values: object, **kwargs: object) -> None:
+        captured["printed"].append(" ".join(str(v) for v in values))
+
+    monkeypatch.setattr("builtins.input", fake_input)
+    monkeypatch.setattr("src.main.run_hierarchical_navigation", fake_navigation)
+    monkeypatch.setattr("builtins.print", fake_print)
+
+    run_hybrid_interface()
+
+    assert any("Erro no modo interativo" in line for line in captured["printed"])
+
+
+def test_run_hybrid_interface_handles_invalid_option(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Valida que opção inválida não interrompe o fluxo."""
+    captured: dict[str, object] = {"printed": []}
+    prompts = iter(["9", "q"])
+
+    def fake_input(prompt: str) -> str:
+        return next(prompts)
+
+    def fake_print(*values: object, **kwargs: object) -> None:
+        captured["printed"].append(" ".join(str(v) for v in values))
+
+    monkeypatch.setattr("builtins.input", fake_input)
+    monkeypatch.setattr("builtins.print", fake_print)
+
+    run_hybrid_interface()
+
+    assert any("Opcao inválida." in line for line in captured["printed"])
+
+
+def test_run_hierarchical_navigation_prompts_system_id_when_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Valida prompt de SYSTEM_ID quando variável não está definida."""
+    captured: dict[str, object] = {}
+    prompts = iter(["sys-from-input", "q"])
+
+    class FakeRepository:
+        def __init__(self, db_path: str) -> None:
+            captured["db_path"] = db_path
+
+        def list_years(self, system_id: str) -> list[tuple[int, float]]:
+            captured["system_id"] = system_id
+            return []
+
+    def fake_input(prompt: str) -> str:
+        return next(prompts)
+
+    monkeypatch.delenv("SYSTEM_ID", raising=False)
+    monkeypatch.setattr("builtins.input", fake_input)
+    monkeypatch.setattr("src.main.SQLiteHourlyEnergyRepository", FakeRepository)
+
+    run_hierarchical_navigation()
+
+    assert captured["system_id"] == "sys-from-input"
+
+
+def test_run_hierarchical_navigation_can_cancel_without_system_id(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Valida cancelamento do modo hierárquico quando SYSTEM_ID não é informado."""
+    captured: dict[str, object] = {"printed": []}
+
+    def fake_input(prompt: str) -> str:
+        return "q"
+
+    def fake_print(*values: object, **kwargs: object) -> None:
+        captured["printed"].append(" ".join(str(v) for v in values))
+
+    monkeypatch.delenv("SYSTEM_ID", raising=False)
+    monkeypatch.setattr("builtins.input", fake_input)
+    monkeypatch.setattr("builtins.print", fake_print)
+
+    run_hierarchical_navigation()
+
+    assert any("Modo interativo cancelado" in line for line in captured["printed"])
+
+
+def test_run_hierarchical_navigation_uses_existing_system_id_without_prompt(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Valida que SYSTEM_ID já definido é usado sem solicitar nova entrada."""
+    captured: dict[str, object] = {"prompts": []}
+
+    class FakeRepository:
+        def __init__(self, db_path: str) -> None:
+            captured["db_path"] = db_path
+
+        def list_years(self, system_id: str) -> list[tuple[int, float]]:
+            captured["system_id"] = system_id
+            return []
+
+    def fake_input(prompt: str) -> str:
+        captured["prompts"].append(prompt)
+        return "q"
+
+    monkeypatch.setenv("SYSTEM_ID", "sys-from-env")
+    monkeypatch.setattr("builtins.input", fake_input)
+    monkeypatch.setattr("src.main.SQLiteHourlyEnergyRepository", FakeRepository)
+
+    run_hierarchical_navigation()
+
+    assert captured["system_id"] == "sys-from-env"
+    assert not any("SYSTEM_ID não definido" in prompt for prompt in captured["prompts"])
+
+
