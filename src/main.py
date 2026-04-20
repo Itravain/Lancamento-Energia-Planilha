@@ -257,12 +257,21 @@ def run_hierarchical_navigation() -> None:
             for index, (year, total) in enumerate(year_rows, start=1):
                 print(f"{index}) {year} - total: {total:.2f}")
             print("Use o índice para entrar em um ano.")
+            print("Use add:<ano> para navegar para um novo ano (ex: add:2021).")
             print("0) Voltar")
             print("q) Sair")
             raw = input("Opcao: ").strip().lower()
             if raw == "q":
                 return
             if raw == "0":
+                continue
+            if raw.startswith("add:"):
+                add_year = _parse_add_year(raw)
+                max_year = date.today().year + 1
+                if add_year is None or add_year < 1900 or add_year > max_year:
+                    print(f"Ano inválido. Use add:AAAA entre 1900 e {max_year}.")
+                    continue
+                selected_year = add_year
                 continue
             if raw.isdigit() and 1 <= int(raw) <= len(year_rows):
                 selected_year = year_rows[int(raw) - 1][0]
@@ -350,6 +359,16 @@ def _parse_api_index(raw: str) -> int | None:
     if len(parts) != 2:
         return None
     if not parts[1].isdigit():
+        return None
+    return int(parts[1])
+
+
+def _parse_add_year(raw: str) -> int | None:
+    """Extrai ano de comandos no formato add:AAAA."""
+    parts = raw.split(":", maxsplit=1)
+    if len(parts) != 2:
+        return None
+    if len(parts[1]) != 4 or not parts[1].isdigit():
         return None
     return int(parts[1])
 
