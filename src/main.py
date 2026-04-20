@@ -299,8 +299,13 @@ def run_hierarchical_navigation() -> None:
                 if api_value is None or api_value < 1 or api_value > 12:
                     print("Indice de API inválido para mês. Use 1..12.")
                     continue
-                _fetch_month_to_cache(provider, repository, system_id, selected_year, api_value)
-                print("Dados do mês persistidos com sucesso.")
+                print(f"Puxando mês {api_value:02d}/{selected_year} da API...")
+                inserted = _fetch_month_to_cache(provider, repository, system_id, selected_year, api_value)
+                print(f"Mês {api_value:02d}/{selected_year} concluído.")
+                if inserted:
+                    print("Dados do mês persistidos com sucesso.")
+                else:
+                    print("Nenhum dado retornado pela API para o mês solicitado.")
                 continue
             if raw.isdigit() and 1 <= int(raw) <= len(month_rows):
                 selected_month = month_rows[int(raw) - 1][0]
@@ -379,12 +384,12 @@ def _fetch_month_to_cache(
     system_id: str,
     year: int,
     month: int,
-) -> None:
+) -> int:
     """Busca todas as horas de um mês na API e persiste no cache."""
     start_at, end_at = repository.month_day_bounds(year, month)
     generation = provider.fetch_hourly_generation(system_id, start_at, end_at)
     if not generation:
-        return
+        return 0
     records = [
         HourlyEnergyRecord(
             system_id,
@@ -394,6 +399,7 @@ def _fetch_month_to_cache(
         for generation_at, energy in generation.items()
     ]
     repository.upsert_many(records)
+    return len(records)
 
 
 def _fetch_day_to_cache(

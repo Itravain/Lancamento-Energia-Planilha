@@ -376,3 +376,69 @@ def test_run_hierarchical_navigation_add_year_then_persist_month_shows_year(
     assert any("1) 2021 - total:" in line for line in captured["printed"])
 
 
+def test_run_hierarchical_navigation_prints_progress_for_api_month(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Valida feedback interativo ao puxar mês via api:<mes>."""
+    captured: dict[str, object] = {"printed": []}
+    prompts = iter(["add:2021", "api:5", "q"])
+
+    class FakeProvider:
+        def fetch_hourly_generation(self, system_id: str, start_at: object, end_at: object) -> dict[object, float]:
+            from datetime import datetime
+
+            return {datetime(2021, 5, 1, 0, 0): 3.7}
+
+    class FakeRepository:
+        def __init__(self, db_path: str) -> None:
+            self._rows: list[tuple[str, object, float]] = []
+
+        def list_years(self, system_id: str) -> list[tuple[int, float]]:
+            grouped: dict[int, float] = {}
+            for row_system_id, generation_at, energy in self._rows:
+                if row_system_id != system_id:
+                    continue
+                grouped[generation_at.year] = grouped.get(generation_at.year, 0.0) + energy
+            return sorted(grouped.items())
+
+        def list_months(self, system_id: str, year: int) -> list[tuple[int, float]]:
+            grouped: dict[int, float] = {}
+            for row_system_id, generation_at, energy in self._rows:
+                if row_system_id != system_id or generation_at.year != year:
+                    continue
+                grouped[generation_at.month] = grouped.get(generation_at.month, 0.0) + energy
+            return sorted(grouped.items())
+
+        def list_days(self, system_id: str, year: int, month: int) -> list[tuple[int, float]]:
+            return []
+
+        def list_hours(self, system_id: str, year: int, month: int, day: int) -> list[tuple[int, float]]:
+            return []
+
+        def month_day_bounds(self, year: int, month: int) -> tuple[object, object]:
+            from datetime import datetime
+
+            return datetime(year, month, 1, 0, 0), datetime(year, month, 1, 23, 0)
+
+        def upsert_many(self, records: list[object]) -> None:
+            for record in records:
+                self._rows.append((record.system_id, record.generation_at, record.energy_kwh))
+
+    def fake_input(prompt: str) -> str:
+        return next(prompts)
+
+    def fake_print(*values: object, **kwargs: object) -> None:
+        captured["printed"].append(" ".join(str(v) for v in values))
+
+    monkeypatch.setenv("SYSTEM_ID", "sys-1")
+    monkeypatch.setattr("builtins.input", fake_input)
+    monkeypatch.setattr("builtins.print", fake_print)
+    monkeypatch.setattr("src.main.APSystemEnergyProvider", FakeProvider)
+    monkeypatch.setattr("src.main.SQLiteHourlyEnergyRepository", FakeRepository)
+
+    run_hierarchical_navigation()
+
+    assert any("Puxando mês 05/2021 da API..." in line for line in captured["printed"])
+    assert any("Mês 05/2021 concluído." in line for line in captured["printed"])
+
+
