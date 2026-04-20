@@ -2,6 +2,10 @@
 credentials.json
 .env
 
+# Artefatos locais de cache/dump
+energy.db
+energy_hourly_full.csv
+
 # Python
 __pycache__/
 *.py[cod]
