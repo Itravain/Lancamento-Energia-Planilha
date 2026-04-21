@@ -5,6 +5,7 @@ credentials.json
 # Artefatos locais de cache/dump
 energy.db
 energy_hourly_full.csv
+relatorios/
 
 # Python
 __pycache__/
