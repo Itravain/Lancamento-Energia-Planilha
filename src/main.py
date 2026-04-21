@@ -19,6 +19,7 @@ from src.interfaces.cli import (
     print_monthly_report,
     print_yearly_report,
 )
+from src.interfaces.csv_export_command import handle_csv_export_command
 
 
 # Carrega .env automaticamente para CLI funcionar sem export manual.
@@ -256,14 +257,17 @@ def run_hierarchical_navigation() -> None:
             print("\nNível Ano")
             for index, (year, total) in enumerate(year_rows, start=1):
                 print(f"{index}) {year} - total: {total:.2f}")
-            print("Use o índice para entrar em um ano.")
-            print("Use add:<ano> para navegar para um novo ano (ex: add:2021).")
             print("0) Voltar")
             print("q) Sair")
             raw = input("Opcao: ").strip().lower()
             if raw == "q":
                 return
             if raw == "0":
+                continue
+            if raw == "help":
+                _print_hierarchical_help()
+                continue
+            if handle_csv_export_command(raw, repository, provider, system_id):
                 continue
             if raw.startswith("add:"):
                 add_year = _parse_add_year(raw)
@@ -284,9 +288,6 @@ def run_hierarchical_navigation() -> None:
             print(f"\nNível Mês - Ano {selected_year}")
             for index, (month, total) in enumerate(month_rows, start=1):
                 print(f"{index}) {month:02d} - total: {total:.2f}")
-            print("Use o índice para entrar em um mês.")
-            print("Use api:<mes> para buscar novo mês (ex: api:05).")
-            print("Use rm:<indice> para remover um mês listado (ex: rm:2).")
             print("0) Voltar")
             print("q) Sair")
             raw = input("Opcao: ").strip().lower()
@@ -294,6 +295,11 @@ def run_hierarchical_navigation() -> None:
                 return
             if raw == "0":
                 selected_year = None
+                continue
+            if raw == "help":
+                _print_hierarchical_help()
+                continue
+            if handle_csv_export_command(raw, repository, provider, system_id):
                 continue
             if raw.startswith("api:"):
                 api_value = _parse_api_index(raw)
@@ -331,9 +337,6 @@ def run_hierarchical_navigation() -> None:
             print(f"\nNível Dia - {selected_month:02d}/{selected_year}")
             for index, (day, total) in enumerate(day_rows, start=1):
                 print(f"{index}) {day:02d} - total: {total:.2f}")
-            print("Use o índice para entrar em um dia.")
-            print("Use api:<dia> para buscar novo dia (ex: api:19).")
-            print("Use rm:<indice> para remover um dia listado (ex: rm:2).")
             print("0) Voltar")
             print("q) Sair")
             raw = input("Opcao: ").strip().lower()
@@ -341,6 +344,11 @@ def run_hierarchical_navigation() -> None:
                 return
             if raw == "0":
                 selected_month = None
+                continue
+            if raw == "help":
+                _print_hierarchical_help()
+                continue
+            if handle_csv_export_command(raw, repository, provider, system_id):
                 continue
             if raw.startswith("api:"):
                 api_value = _parse_api_index(raw)
@@ -372,7 +380,6 @@ def run_hierarchical_navigation() -> None:
         print(f"\nNível Hora - {selected_day:02d}/{selected_month:02d}/{selected_year}")
         for hour, energy in hour_rows:
             print(f"{hour:02d}:00 -> {energy}")
-        print("Comando api:indice não permitido neste nível.")
         print("0) Voltar")
         print("q) Sair")
         raw = input("Opcao: ").strip().lower()
@@ -380,6 +387,11 @@ def run_hierarchical_navigation() -> None:
             return
         if raw == "0":
             selected_day = None
+            continue
+        if raw == "help":
+            _print_hierarchical_help()
+            continue
+        if handle_csv_export_command(raw, repository, provider, system_id):
             continue
         print("Opcao inválida.")
 
@@ -412,6 +424,22 @@ def _parse_rm_index(raw: str) -> int | None:
     if not parts[1].isdigit():
         return None
     return int(parts[1])
+
+
+def _print_hierarchical_help() -> None:
+    """Exibe todas as dicas do modo interativo hierárquico."""
+    print("\nDicas do modo interativo")
+    print("- help: mostra esta ajuda.")
+    print("- 0: volta um nível.")
+    print("- q: sai do modo interativo.")
+    print("- csv-export:[-p;]DD-MM-AAAA[;DD-MM-AAAA];hour|day|month|year funciona em qualquer nível.")
+    print("- com uma data só, o relatório vai até hoje.")
+    print("- exportações até hoje ignoram os 2 últimos dias por confiabilidade dos dados.")
+    print("- use -p para exportar em formato de planilha, com separador ';'.")
+    print("- Nível Ano: índice da lista e add:AAAA.")
+    print("- Nível Mês: índice da lista, api:<mes> e rm:<indice>.")
+    print("- Nível Dia: índice da lista, api:<dia> e rm:<indice>.")
+    print("- Nível Hora: índice da lista.")
 
 
 def _fetch_month_to_cache(
