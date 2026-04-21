@@ -101,3 +101,42 @@ def test_month_day_bounds_returns_full_month_range(tmp_path: pytest.TempPathFact
 
     assert start_at == datetime(2026, 2, 1, 0, 0)
     assert end_at == datetime(2026, 2, 28, 23, 0)
+
+
+def test_delete_month_removes_only_target_month(tmp_path: pytest.TempPathFactory) -> None:
+    db_path = tmp_path / "energy.db"
+    repository = SQLiteHourlyEnergyRepository(str(db_path))
+
+    repository.upsert_many(
+        [
+            HourlyEnergyRecord("sys-1", datetime(2026, 1, 2, 10), 1.0),
+            HourlyEnergyRecord("sys-1", datetime(2026, 2, 3, 9), 3.0),
+            HourlyEnergyRecord("sys-1", datetime(2026, 2, 3, 10), 4.0),
+        ]
+    )
+
+    deleted = repository.delete_month("sys-1", 2026, 2)
+
+    january_rows = repository.list_days("sys-1", 2026, 1)
+    february_rows = repository.list_days("sys-1", 2026, 2)
+    assert deleted == 2
+    assert january_rows == [(2, 1.0)]
+    assert february_rows == []
+
+
+def test_delete_day_removes_only_target_day(tmp_path: pytest.TempPathFactory) -> None:
+    db_path = tmp_path / "energy.db"
+    repository = SQLiteHourlyEnergyRepository(str(db_path))
+
+    repository.upsert_many(
+        [
+            HourlyEnergyRecord("sys-1", datetime(2026, 2, 3, 9), 3.0),
+            HourlyEnergyRecord("sys-1", datetime(2026, 2, 4, 10), 4.0),
+        ]
+    )
+
+    deleted = repository.delete_day("sys-1", 2026, 2, 3)
+
+    days = repository.list_days("sys-1", 2026, 2)
+    assert deleted == 1
+    assert days == [(4, 4.0)]

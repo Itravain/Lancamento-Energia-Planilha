@@ -135,6 +135,36 @@ class SQLiteHourlyEnergyRepository:
 
         return [(int(hour_key), float(energy_kwh)) for hour_key, energy_kwh in rows if hour_key]
 
+    def delete_month(self, system_id: str, year: int, month: int) -> int:
+        """Apaga todos os registros de um mês específico e retorna quantidade removida."""
+        with sqlite3.connect(self.db_path) as connection:
+            cursor = connection.execute(
+                """
+                DELETE FROM energy_hourly
+                WHERE system_id = ?
+                  AND strftime('%Y-%m', generation_at) = ?
+                """,
+                (system_id, f"{year:04d}-{month:02d}"),
+            )
+            deleted_rows = cursor.rowcount
+            connection.commit()
+        return deleted_rows
+
+    def delete_day(self, system_id: str, year: int, month: int, day: int) -> int:
+        """Apaga todos os registros de um dia específico e retorna quantidade removida."""
+        with sqlite3.connect(self.db_path) as connection:
+            cursor = connection.execute(
+                """
+                DELETE FROM energy_hourly
+                WHERE system_id = ?
+                  AND strftime('%Y-%m-%d', generation_at) = ?
+                """,
+                (system_id, f"{year:04d}-{month:02d}-{day:02d}"),
+            )
+            deleted_rows = cursor.rowcount
+            connection.commit()
+        return deleted_rows
+
     def month_day_bounds(self, year: int, month: int) -> tuple[datetime, datetime]:
         """Retorna limites de datetime para um mês completo."""
         last_day = monthrange(year, month)[1]

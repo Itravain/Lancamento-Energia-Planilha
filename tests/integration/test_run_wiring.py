@@ -442,3 +442,80 @@ def test_run_hierarchical_navigation_prints_progress_for_api_month(
     assert any("Mês 05/2021 concluído." in line for line in captured["printed"])
 
 
+def test_run_hierarchical_navigation_supports_remove_month_by_index(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Valida comando rm:<indice> no nível mês."""
+    captured: dict[str, object] = {"deleted": None}
+    prompts = iter(["1", "rm:1", "q"])
+
+    class FakeProvider:
+        pass
+
+    class FakeRepository:
+        def __init__(self, db_path: str) -> None:
+            return
+
+        def list_years(self, system_id: str) -> list[tuple[int, float]]:
+            return [(2026, 10.0)]
+
+        def list_months(self, system_id: str, year: int) -> list[tuple[int, float]]:
+            return [(4, 10.0)]
+
+        def delete_month(self, system_id: str, year: int, month: int) -> int:
+            captured["deleted"] = (system_id, year, month)
+            return 2
+
+    def fake_input(prompt: str) -> str:
+        return next(prompts)
+
+    monkeypatch.setenv("SYSTEM_ID", "sys-1")
+    monkeypatch.setattr("builtins.input", fake_input)
+    monkeypatch.setattr("src.main.APSystemEnergyProvider", FakeProvider)
+    monkeypatch.setattr("src.main.SQLiteHourlyEnergyRepository", FakeRepository)
+
+    run_hierarchical_navigation()
+
+    assert captured["deleted"] == ("sys-1", 2026, 4)
+
+
+def test_run_hierarchical_navigation_supports_remove_day_by_index(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Valida comando rm:<indice> no nível dia."""
+    captured: dict[str, object] = {"deleted": None}
+    prompts = iter(["1", "1", "rm:1", "q"])
+
+    class FakeProvider:
+        pass
+
+    class FakeRepository:
+        def __init__(self, db_path: str) -> None:
+            return
+
+        def list_years(self, system_id: str) -> list[tuple[int, float]]:
+            return [(2026, 10.0)]
+
+        def list_months(self, system_id: str, year: int) -> list[tuple[int, float]]:
+            return [(4, 10.0)]
+
+        def list_days(self, system_id: str, year: int, month: int) -> list[tuple[int, float]]:
+            return [(19, 10.0)]
+
+        def delete_day(self, system_id: str, year: int, month: int, day: int) -> int:
+            captured["deleted"] = (system_id, year, month, day)
+            return 3
+
+    def fake_input(prompt: str) -> str:
+        return next(prompts)
+
+    monkeypatch.setenv("SYSTEM_ID", "sys-1")
+    monkeypatch.setattr("builtins.input", fake_input)
+    monkeypatch.setattr("src.main.APSystemEnergyProvider", FakeProvider)
+    monkeypatch.setattr("src.main.SQLiteHourlyEnergyRepository", FakeRepository)
+
+    run_hierarchical_navigation()
+
+    assert captured["deleted"] == ("sys-1", 2026, 4, 19)
+
+

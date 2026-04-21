@@ -1,6 +1,6 @@
 import pytest
 
-from src.main import _parse_add_year, _parse_api_index, parse_terminal_args
+from src.main import _parse_add_year, _parse_api_index, _parse_rm_index, parse_terminal_args
 
 
 pytestmark = pytest.mark.unit
@@ -73,5 +73,14 @@ def test_parse_add_year_with_invalid_value() -> None:
     assert _parse_add_year("add:21") is None
     assert _parse_add_year("add:abcd") is None
     assert _parse_add_year("add") is None
+
+
+def test_parse_rm_index_with_valid_value() -> None:
+    assert _parse_rm_index("rm:2") == 2
+
+
+def test_parse_rm_index_with_invalid_value() -> None:
+    assert _parse_rm_index("rm:xx") is None
+    assert _parse_rm_index("rm") is None
 
 
