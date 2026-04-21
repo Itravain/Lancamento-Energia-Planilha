@@ -286,6 +286,7 @@ def run_hierarchical_navigation() -> None:
                 print(f"{index}) {month:02d} - total: {total:.2f}")
             print("Use o índice para entrar em um mês.")
             print("Use api:<mes> para buscar novo mês (ex: api:05).")
+            print("Use rm:<indice> para remover um mês listado (ex: rm:2).")
             print("0) Voltar")
             print("q) Sair")
             raw = input("Opcao: ").strip().lower()
@@ -307,6 +308,18 @@ def run_hierarchical_navigation() -> None:
                 else:
                     print("Nenhum dado retornado pela API para o mês solicitado.")
                 continue
+            if raw.startswith("rm:"):
+                remove_index = _parse_rm_index(raw)
+                if remove_index is None or remove_index < 1 or remove_index > len(month_rows):
+                    print("Indice de remoção inválido para mês. Use 1..N da lista.")
+                    continue
+                target_month = month_rows[remove_index - 1][0]
+                deleted = repository.delete_month(system_id, selected_year, target_month)
+                print(
+                    f"Mês {target_month:02d}/{selected_year} removido. "
+                    f"Registros apagados: {deleted}."
+                )
+                continue
             if raw.isdigit() and 1 <= int(raw) <= len(month_rows):
                 selected_month = month_rows[int(raw) - 1][0]
                 continue
@@ -320,6 +333,7 @@ def run_hierarchical_navigation() -> None:
                 print(f"{index}) {day:02d} - total: {total:.2f}")
             print("Use o índice para entrar em um dia.")
             print("Use api:<dia> para buscar novo dia (ex: api:19).")
+            print("Use rm:<indice> para remover um dia listado (ex: rm:2).")
             print("0) Voltar")
             print("q) Sair")
             raw = input("Opcao: ").strip().lower()
@@ -335,6 +349,18 @@ def run_hierarchical_navigation() -> None:
                     continue
                 _fetch_day_to_cache(provider, repository, system_id, selected_year, selected_month, api_value)
                 print("Dados do dia persistidos com sucesso.")
+                continue
+            if raw.startswith("rm:"):
+                remove_index = _parse_rm_index(raw)
+                if remove_index is None or remove_index < 1 or remove_index > len(day_rows):
+                    print("Indice de remoção inválido para dia. Use 1..N da lista.")
+                    continue
+                target_day = day_rows[remove_index - 1][0]
+                deleted = repository.delete_day(system_id, selected_year, selected_month, target_day)
+                print(
+                    f"Dia {target_day:02d}/{selected_month:02d}/{selected_year} removido. "
+                    f"Registros apagados: {deleted}."
+                )
                 continue
             if raw.isdigit() and 1 <= int(raw) <= len(day_rows):
                 selected_day = day_rows[int(raw) - 1][0]
@@ -374,6 +400,16 @@ def _parse_add_year(raw: str) -> int | None:
     if len(parts) != 2:
         return None
     if len(parts[1]) != 4 or not parts[1].isdigit():
+        return None
+    return int(parts[1])
+
+
+def _parse_rm_index(raw: str) -> int | None:
+    """Extrai índice numérico de comandos no formato rm:<indice>."""
+    parts = raw.split(":", maxsplit=1)
+    if len(parts) != 2:
+        return None
+    if not parts[1].isdigit():
         return None
     return int(parts[1])
 
