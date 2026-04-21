@@ -26,7 +26,7 @@ class FakeHourlyProvider:
         }
 
 
-def test_second_execution_uses_cache(tmp_path: pytest.TempPathFactory) -> None:
+def test_second_execution_reads_from_sqlite_cache(tmp_path: pytest.TempPathFactory) -> None:
     repository = SQLiteHourlyEnergyRepository(str(tmp_path / "energy.db"))
     provider = FakeHourlyProvider()
     use_case = GetHourlyEnergyRange(provider, repository)

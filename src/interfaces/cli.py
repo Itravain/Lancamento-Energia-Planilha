@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from src.domain.energy_report import MonthlyEnergyReport
+from src.domain.energy_report import DailyEnergyReport, MonthlyEnergyReport, YearlyEnergyReport
 
 
 def print_monthly_report(report: MonthlyEnergyReport) -> None:
@@ -20,3 +20,22 @@ def print_hourly_report(generation: dict[datetime, float]) -> None:
     for generation_at in sorted(generation.keys()):
         value = generation[generation_at]
         print(f"{generation_at.strftime('%d/%m/%Y %H:%M')}: {value}")
+
+
+def print_daily_report(report: DailyEnergyReport) -> None:
+    """Imprime relatório diário com detalhamento por hora."""
+    print(f"Geracao diaria - {report.day.strftime('%d/%m/%Y')}")
+    print(f"Total no dia: {report.total_generation:.2f}")
+    print("Detalhamento por hora:")
+    for generation_at in sorted(report.hourly_generation.keys()):
+        value = report.hourly_generation[generation_at]
+        print(f"{generation_at.strftime('%d/%m/%Y %H:%M')}: {value}")
+
+
+def print_yearly_report(report: YearlyEnergyReport) -> None:
+    """Imprime relatório anual com detalhamento por mês."""
+    print(f"Geracao anual - {report.year}")
+    print(f"Total no ano: {report.total_generation:.2f}")
+    print("Detalhamento mensal:")
+    for month, value in report.monthly_generation.items():
+        print(f"{month}: {value}")

@@ -34,7 +34,6 @@ class GetHourlyEnergyRange:
             try:
                 fetched = self.energy_provider.fetch_hourly_generation(system_id, start_at, end_at)
             except Exception:
-                # Em caso de falha da API, devolve o que já existe em cache.
                 return {hour: cached[hour] for hour in sorted(cached.keys())}
             to_persist = [
                 HourlyEnergyRecord(system_id, hour, energy)

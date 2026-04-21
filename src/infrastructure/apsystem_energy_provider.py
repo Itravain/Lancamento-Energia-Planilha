@@ -44,7 +44,6 @@ class APSystemEnergyProvider:
         if not response_data:
             return {}
 
-        # Formato 1: lista sequencial de valores por hora.
         if isinstance(response_data, list) and all(
             item is None or isinstance(item, (int, float, str)) for item in response_data
         ):
@@ -58,7 +57,6 @@ class APSystemEnergyProvider:
                 current += timedelta(hours=1)
             return result
 
-        # Formato 2: lista de objetos com data/hora e energia.
         if isinstance(response_data, list):
             result: dict[datetime, float] = {}
             for item in response_data:
@@ -72,9 +70,8 @@ class APSystemEnergyProvider:
                     result[dt] = value
             return result
 
-        # Formato 3: dicionário com datetime como chave e energia como valor.
         if isinstance(response_data, dict):
-            result: dict[datetime, float] = {}
+            result = {}
             for raw_dt, raw_value in response_data.items():
                 dt = self._parse_datetime(str(raw_dt))
                 if dt is None:
@@ -107,7 +104,7 @@ class APSystemEnergyProvider:
         system_id: str,
         start_at: datetime,
         end_at: datetime,
-    ) -> dict[datetime, float]:
+    ) -> dict[datetime, float] | list[object]:
         """Realiza chamadas diárias para obter geração horária em um intervalo."""
         url = f"{self.base_url}/{system_id}"
         day_cursor = start_at.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -118,7 +115,6 @@ class APSystemEnergyProvider:
             params = {
                 "sid": system_id,
                 "energy_level": "hourly",
-                # A API aceita granularidade horária com date_range de dia único.
                 "date_range": day_cursor.strftime("%Y-%m-%d"),
             }
             raw_day_data = self._request_data(url, params)
@@ -134,7 +130,6 @@ class APSystemEnergyProvider:
         day_base: datetime,
     ) -> dict[datetime, float]:
         """Normaliza payload horário em mapa datetime -> energia."""
-        # Formato sequencial com 24 valores horários (00:00 ... 23:00).
         if isinstance(payload, list) and all(
             item is None or isinstance(item, (int, float, str)) for item in payload
         ):
@@ -149,7 +144,6 @@ class APSystemEnergyProvider:
                 result[day_base + timedelta(hours=hour_index)] = value
             return result
 
-        # Formato lista de objetos com datetime + energia.
         if isinstance(payload, list):
             result: dict[datetime, float] = {}
             for item in payload:
@@ -162,7 +156,6 @@ class APSystemEnergyProvider:
                 result[dt] = value
             return result
 
-        # Formato dict de chaves datetime para energia.
         if isinstance(payload, dict):
             result: dict[datetime, float] = {}
             for raw_dt, raw_value in payload.items():

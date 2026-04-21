@@ -1,4 +1,5 @@
 import sqlite3
+from calendar import monthrange
 from datetime import datetime
 
 from src.domain.energy_report import HourlyEnergyRecord
@@ -59,6 +60,87 @@ class SQLiteHourlyEnergyRepository:
                 payload,
             )
             connection.commit()
+
+    def list_years(self, system_id: str) -> list[tuple[int, float]]:
+        """Lista anos disponíveis com total de geração por ano."""
+        with sqlite3.connect(self.db_path) as connection:
+            cursor = connection.execute(
+                """
+                SELECT strftime('%Y', generation_at) AS year_key,
+                       SUM(energy_kwh) AS total_kwh
+                FROM energy_hourly
+                WHERE system_id = ?
+                GROUP BY year_key
+                ORDER BY year_key ASC
+                """,
+                (system_id,),
+            )
+            rows = cursor.fetchall()
+
+        return [(int(year_key), float(total_kwh)) for year_key, total_kwh in rows if year_key]
+
+    def list_months(self, system_id: str, year: int) -> list[tuple[int, float]]:
+        """Lista meses do ano com dados e total de geração por mês."""
+        with sqlite3.connect(self.db_path) as connection:
+            cursor = connection.execute(
+                """
+                SELECT strftime('%m', generation_at) AS month_key,
+                       SUM(energy_kwh) AS total_kwh
+                FROM energy_hourly
+                WHERE system_id = ?
+                  AND strftime('%Y', generation_at) = ?
+                GROUP BY month_key
+                ORDER BY month_key ASC
+                """,
+                (system_id, f"{year:04d}"),
+            )
+            rows = cursor.fetchall()
+
+        return [(int(month_key), float(total_kwh)) for month_key, total_kwh in rows if month_key]
+
+    def list_days(self, system_id: str, year: int, month: int) -> list[tuple[int, float]]:
+        """Lista dias do mês com dados e total de geração por dia."""
+        with sqlite3.connect(self.db_path) as connection:
+            cursor = connection.execute(
+                """
+                SELECT strftime('%d', generation_at) AS day_key,
+                       SUM(energy_kwh) AS total_kwh
+                FROM energy_hourly
+                WHERE system_id = ?
+                  AND strftime('%Y-%m', generation_at) = ?
+                GROUP BY day_key
+                ORDER BY day_key ASC
+                """,
+                (system_id, f"{year:04d}-{month:02d}"),
+            )
+            rows = cursor.fetchall()
+
+        return [(int(day_key), float(total_kwh)) for day_key, total_kwh in rows if day_key]
+
+    def list_hours(self, system_id: str, year: int, month: int, day: int) -> list[tuple[int, float]]:
+        """Lista detalhamento horário de um dia específico."""
+        with sqlite3.connect(self.db_path) as connection:
+            cursor = connection.execute(
+                """
+                SELECT strftime('%H', generation_at) AS hour_key,
+                       energy_kwh
+                FROM energy_hourly
+                WHERE system_id = ?
+                  AND strftime('%Y-%m-%d', generation_at) = ?
+                ORDER BY hour_key ASC
+                """,
+                (system_id, f"{year:04d}-{month:02d}-{day:02d}"),
+            )
+            rows = cursor.fetchall()
+
+        return [(int(hour_key), float(energy_kwh)) for hour_key, energy_kwh in rows if hour_key]
+
+    def month_day_bounds(self, year: int, month: int) -> tuple[datetime, datetime]:
+        """Retorna limites de datetime para um mês completo."""
+        last_day = monthrange(year, month)[1]
+        start_at = datetime(year, month, 1, 0, 0)
+        end_at = datetime(year, month, last_day, 23, 0)
+        return start_at, end_at
 
     def _initialize_schema(self) -> None:
         """Cria tabela e índices mínimos para leitura/escrita horária."""
