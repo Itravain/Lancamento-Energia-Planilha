@@ -1,6 +1,10 @@
+from datetime import datetime
+
 import pytest
 
+from src.domain.energy_report import HourlyEnergyRecord
 from src.domain.energy_report import MonthlyEnergyReport
+from src.infrastructure.sqlite_hourly_energy_repository import SQLiteHourlyEnergyRepository
 from src.main import run, run_hourly, run_hybrid_interface, run_hierarchical_navigation, run_terminal
 
 
@@ -517,5 +521,89 @@ def test_run_hierarchical_navigation_supports_remove_day_by_index(
     run_hierarchical_navigation()
 
     assert captured["deleted"] == ("sys-1", 2026, 4, 19)
+
+
+@pytest.mark.parametrize(
+    "prompts",
+    [
+        ["csv-export:05-02-2026;05-03-2026;month", "q"],
+        ["1", "csv-export:05-02-2026;05-03-2026;month", "q"],
+        ["1", "1", "csv-export:05-02-2026;05-03-2026;month", "q"],
+        ["1", "1", "1", "csv-export:05-02-2026;05-03-2026;month", "q"],
+    ],
+)
+def test_run_hierarchical_navigation_supports_csv_export_in_any_level(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: pytest.TempPathFactory,
+    prompts: list[str],
+) -> None:
+    """Valida csv-export em níveis ano, mês, dia e hora."""
+    monkeypatch.setenv("SYSTEM_ID", "sys-1")
+    monkeypatch.setenv("ENERGY_DB_PATH", str(tmp_path / "energy.db"))
+    monkeypatch.chdir(tmp_path)
+
+    repository = SQLiteHourlyEnergyRepository(str(tmp_path / "energy.db"))
+    repository.upsert_many(
+        [
+            HourlyEnergyRecord("sys-1", datetime(2026, 2, 5, 10), 1.0),
+            HourlyEnergyRecord("sys-1", datetime(2026, 2, 5, 11), 2.0),
+            HourlyEnergyRecord("sys-1", datetime(2026, 3, 5, 10), 3.0),
+        ]
+    )
+
+    captured: dict[str, object] = {"printed": []}
+    prompt_iter = iter(prompts)
+
+    class FakeProvider:
+        pass
+
+    def fake_input(prompt: str) -> str:
+        return next(prompt_iter)
+
+    def fake_print(*values: object, **kwargs: object) -> None:
+        captured["printed"].append(" ".join(str(v) for v in values))
+
+    monkeypatch.setattr("builtins.input", fake_input)
+    monkeypatch.setattr("builtins.print", fake_print)
+    monkeypatch.setattr("src.main.APSystemEnergyProvider", FakeProvider)
+
+    run_hierarchical_navigation()
+
+    output_path = tmp_path / "relatorios" / "relat_05-02-2026_05-03-2026_month.csv"
+    assert output_path.exists()
+    assert any("CSV exportado com sucesso" in line for line in captured["printed"])
+
+
+def test_run_hierarchical_navigation_shows_help_on_help(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Valida que help imprime as dicas centralizadas da interface."""
+    captured: dict[str, object] = {"printed": []}
+    prompts = iter(["help", "q"])
+
+    class FakeRepository:
+        def __init__(self, db_path: str) -> None:
+            return
+
+        def list_years(self, system_id: str) -> list[tuple[int, float]]:
+            return [(2026, 10.0)]
+
+    def fake_input(prompt: str) -> str:
+        return next(prompts)
+
+    def fake_print(*values: object, **kwargs: object) -> None:
+        captured["printed"].append(" ".join(str(v) for v in values))
+
+    monkeypatch.setenv("SYSTEM_ID", "sys-1")
+    monkeypatch.setattr("builtins.input", fake_input)
+    monkeypatch.setattr("builtins.print", fake_print)
+    monkeypatch.setattr("src.main.SQLiteHourlyEnergyRepository", FakeRepository)
+
+    run_hierarchical_navigation()
+
+    printed = captured["printed"]
+    assert any("Dicas do modo interativo" in line for line in printed)
+    assert any("- help: mostra esta ajuda." in line for line in printed)
+    assert sum("csv-export:" in line for line in printed) == 1
 
 
